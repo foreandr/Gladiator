@@ -3,16 +3,15 @@ Coder: Dre Foreman
 Purpose:
 Date:
 '''
-
+from Utilities import *
 import pickle
 import socket
 import threading
+from tkinter import *
 import CONSTANTS
 import Utilities
-from Utilities import *
 
-
-class Node:
+class Server:
     '''
     Notes to remember:
     can only send bytes and not strings.
@@ -20,7 +19,6 @@ class Node:
     '''Variables'''
 
     # Lists For Clients and Their Nicknames
-    # name = "Andre" #CHANGE FOR SECOND NODE
     clients = []
     nicknames = []
     Servers = []
@@ -29,12 +27,6 @@ class Node:
     bets = []
     nickname_client_dict = {}
 
-    # MONERO DETAILS
-    # Wallet = Wallet(JSONRPCWallet(port=28088))
-    fakeMoneroPerson = {
-        'ADDRESS': 'ABC123',
-        'NAME': 'Jorge'
-    }
 
     '''------------------------------------------------------------------------------------------------'''
     '''SERVER RELATED STUFF'''
@@ -96,40 +88,25 @@ class Node:
         def execute_bet(stored_bet, challenger_message):
             print_green("Executing Bet...")
 
-            # print(stored_bet)
-            # print(challenger_message)
-
             def check_both_parties_balances(stored_bet_=stored_bet, challenger_message_=challenger_message):
                 print_green("\nChecking Balances")
                 dict_to_send = {
                     'TYPE': 'BALANCE CHECK'
                 }
                 challenger_message_.update(dict_to_send)
-                # print('testing dict')
-                # print(stored_bet_)
-                # print(challenger_message_)
-                # print('got to here1')
                 mini_dict = {'Opponent Bet Value': stored_bet_['Opponent Bet Value']}
                 challenger_message_.update(mini_dict)
-                # print(challenger_message_)
-                # print('got to here2')
+
                 client.send(pickle.dumps(challenger_message_))
-                # balances_check = pickle.loads(client.recv(100000))
-                # print('BALANCES CHECK')
-                # print(balances_check)
 
             check_both_parties_balances()
 
-        # IDK HOW NECESSARY THESE GLOBALS ARE, THIS IS KIND OF DESIGNED POORLY
         global found_match, RESULT, current_bet
 
         while True:
             try:
                 # Broadcasting Messages
                 message = pickle.loads(client.recv(100000))
-                # print(str(message))
-                # print(message['TYPE'])
-                # print(type(message))
                 if message["TYPE"] == 'BET':
                     print_green("\nRECIEVED BET...")
                     self.bets.append(message)
@@ -219,9 +196,7 @@ class Node:
                         # print(better1, better2)
                         # print(self.dict_of_bet_details[f'{better1}'], self.dict_of_bet_details[f'{better2}'])
 
-                        result_dict = Utilities.get_fight_result()
-                        print('RESULT FROM SCRAPING SITE', result_dict)
-                        print('DICT OF BET DETAILS', self.dict_of_bet_details)
+
 
                         # GRABBING THE CORRECT BET
                         for i in self.bets:  # SOMETHING WRONG HERE, 'KEY': 2 # there is some confusion here
@@ -233,6 +208,11 @@ class Node:
                                     # print('FOUND BET :', current_bet)
 
                         print_green(f'CURRENT BET\n{current_bet}')
+
+                        result_dict = Utilities.get_fight_result(current_bet['Bet Participant1'], current_bet['Bet Participant2'])
+                        print('RESULT FROM SCRAPING SITE', result_dict)
+                        print('DICT OF BET DETAILS', self.dict_of_bet_details)
+
                         # check who won the bet and assign them the winner
                         if current_bet["NICKNAME"] == better1:
                             print('NO CHANGE ', current_bet["NICKNAME"], 'is', better1)
@@ -305,7 +285,8 @@ class Node:
 
                         send_winnings_dict = {
                             'TYPE': 'WINNINGS',
-                            'AMOUNT': final_dict['WINNINGS']
+                            'AMOUNT': final_dict['WINNINGS'],
+                            'BET DETAILS': current_bet
                         }
 
                         final_dict['WINNER CLIENT'].send(pickle.dumps(send_winnings_dict))
@@ -343,7 +324,7 @@ class Node:
                     }
                     self.nickname_client_dict[message['ASKER NICKNAME']].send(pickle.dumps(dict_with_file_info))
                 else:
-                    print("SERVER DOESNT HAVE THIS TYPE OF MESSAGE")
+                    print("SERVER DOES NOT RECOGNIZE THIS TYPE OF MESSAGE")
                     print(message)
             except Exception as e:
                 print(f'\nCALLING EXCEPTION: {e}')  # super helpful!
@@ -373,7 +354,8 @@ class Node:
             print("Connected with {}".format(str(address)))
 
             # Request And Store Nickname
-            nameDict = {'TYPE': "NICK"
+            nameDict = {
+                'TYPE': "NICK"
                         }
             client.send(pickle.dumps(nameDict))
             nickname = pickle.loads(client.recv(1024))
@@ -391,57 +373,10 @@ class Node:
             thread = threading.Thread(target=self.handle_client_msg, args=(client,))
             thread.start()
 
-    '''------------------------------------------------------------------------------------------------'''
-
-    '''CLIENT RELATED STUFF'''
-    nickname = "Andre"  # CHANGE FOR SECOND NODE
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    # Connecting To Server
-    def connect_to_server(self):
-        '''
-        Instead of binding the data and listening, we are connecting to an existing server.
-        :return:
-        '''
-        self.client.connect((CONSTANTS.LOCAL_HOST_IPV4, CONSTANTS.PORT))
-
-    # Listening to Server and Sending Nickname
-    def receive_from_server(self):
-        '''
-        It constantly tries to receive messages and to print them onto the screen.
-        If the message is ‘NICK’ however, it doesn’t print it but it sends its nickname to the server.
-        :return:
-        '''
-        while True:
-            try:
-                # Receive Message From Server
-                # If 'NICK' Send Nickname
-                message = self.client.recv(1024).decode('utf-8')
-                if message == 'NICK':
-                    self.client.send(self.nickname.encode('utf-8'))
-                else:
-                    print(message)
-            except:
-                # Close Connection When Error
-                print("An error occured!")
-                self.client.close()
-                break
-
-    # Sending Messages To Server
-    def write_to_server(self):
-        while True:
-            message = f"{self.nickname}: {input('')}"  # weird way to get input, but kind of cool
-            self.client.send(message.encode('utf-8'))
-
-    # Starting Threads For Listening And Writing
-    def run_threads(self):
-        receive_thread = threading.Thread(target=self.receive_from_server)
-        receive_thread.start()
-        write_thread = threading.Thread(target=self.write_to_server)
-        write_thread.start()
-
 
 '''SERVER STUFF'''
-node = Node()
+node = Server()
 node.starting_server()
 node.listen()
+
+

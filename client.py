@@ -4,19 +4,22 @@ import threading
 from tkinter import *
 import CONSTANTS
 import Utilities
+from monero.wallet import Wallet
+from monero.backends.jsonrpc import JSONRPCWallet
 
-
-class Node:
+class Client:
+    # MONERO DETAILS
     '''
-    Notes to remember:
-    can only send bytes and not strings.
+    RUNNING MONERO:
+    monero-wallet-cli
+    monero-wallet-rp
     '''
-    '''Variables'''
+    # Wallet = Wallet(JSONRPCWallet(port=28088))
+    # balance = Wallet.balance()
+    # address = Wallet.address()
+    balance = 100 # ARBITRARY AMOUNT FOR TESTING
 
-    # Lists For Clients and Their Nicknames
     nickname = Utilities.get_nickname()  # input("Tell us your name:")  # CHANGE FOR SECOND NODE
-    balance = 100
-
     clients = []
     nicknames = []
     Servers = []
@@ -24,79 +27,11 @@ class Node:
     host = CONSTANTS.LOCAL_HOST_IPV4
     port = CONSTANTS.PORT
 
-    # MONERO DETAILS
-    # Wallet = Wallet(JSONRPCWallet(port=28088))
+
 
     '''SERVER RELATED STUFF'''
-
-    # Starting Server
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    def starting_server(self):
-        self.server.bind((CONSTANTS.LOCAL_HOST_IPV4, CONSTANTS.PORT))
-        self.server.listen()
-
-    # Sending Messages To All Connected Clients
-    def broadcast_to_clients(self, message):
-        for client in self.clients:
-            client.send(message)
-
-    # Handling Messages From Clients
-    def handle_client_msg(self, client):
-        """
-        :param client:
-        Everytime a client connects to our server we run this function for it and it starts an endless loop.
-        What it then does is receiving the message from the client (if he sends any) and broadcasting it to all connected clients
-        If for some reason there is an error with the connection to this client, we remove it and its nickname, close the connection and broadcast that this client has left the chat.
-        :return:
-        """
-        while True:
-            try:
-                # Broadcasting Messages
-                message = client.recv(1024)
-                self.broadcast_to_clients(message)
-            except Exception as e:
-                print(f'CALLING EXCEPTION: {e}')  # super helpful!
-                # Removing And Closing Clients
-                index = self.clients.index(client)
-                self.clients.remove(client)
-                client.close()
-                nickname = self.nicknames[index]
-                self.broadcast_to_clients(f'{nickname} left!'.encode('utf-8'))
-                self.nicknames.remove(nickname)
-                break
-
-    # Receiving / Listening Function
-    def listen(self):
-        print("Waiting for connections...")
-        '''
-        starts an endless while-loop which constantly accepts new connections from clients.
-        sends the string ‘NICK’ to it, which will tell the client that its nickname is requested
-        After that it waits for a response (which hopefully contains the nickname) and appends the client with the respective nickname to the lists
-        start a new thread that runs the previously implemented handling function for this PARTICULAR client.
-        :return:
-        '''
-        while True:
-            # Accept Connection
-            client, address = self.server.accept()
-            print("Connected with {}".format(str(address)))
-
-            # Request And Store Nickname
-            client.send('NICK'.encode('utf-8'))
-            nickname = client.recv(1024).decode('utf-8')
-            self.nicknames.append(nickname)
-            self.clients.append(client)
-
-            # Print And Broadcast Nickname
-            print("Nickname is {}".format(nickname))
-            self.broadcast_to_clients("{} joined!".format(nickname).encode('utf-8'))
-            client.send('Connected to server!'.encode('utf-8'))
-
-            # Start Handling Thread For Client
-            thread = threading.Thread(target=self.handle_client_msg, args=(client,))
-            thread.start()
-
     '''------------------------------------------------------------------------------------------------'''
+
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # Connecting To Server
@@ -170,12 +105,13 @@ class Node:
                     print(f"Sending out:{sending}")
 
                     self.client.send(pickle.dumps(execution_confirmation_dict))
-                elif message['TYPE'] == 'AMOUNT':
+                elif message['TYPE'] == 'WINNINGS':
+                    print('\nCONGRADULATIONS, YOU WIN!!')
                     print('WINNINGS')
-                    print(message)
                     print(message['AMOUNT'])
-                    print(type(message['AMOUNT']))
-                    self.balance += float(message['WINNINGS'])  # monero addr
+                    # print(type(message['AMOUNT']))
+
+                    Utilities.divide_winnings(message)
                 elif message['TYPE'] == 'DIFFERENT CLI/SERVER':
                     print('different clients, send a request for their code')
                     print('THEIR CLIENT', message['THEIR CLIENT HASH'])
@@ -200,6 +136,7 @@ class Node:
                 elif message['TYPE'] == 'SENT FILES':
                     Utilities.put_files_in_folder(message['PROVIDER NICKNAME'], message['CLIENT'], message['SERVER'])
                 else:
+                    print('CLIENT DOES NOT RECOGNIZE THIS TYPE OF MESSAGE')
                     print(message)
             except Exception as e:
                 print(f'CALLING EXCEPTION: {e}')  # super helpful!
@@ -225,16 +162,6 @@ class Node:
         write_thread = threading.Thread(target=self.write_to_server)
         write_thread.start()
 
-    '''BET INFORMATION------------------------------------------------------------------------------------------------
-    proposed_bet = betFunctions.propose_single_bet()
-
-    def propose_bet_to_server(self, betDetails=proposed_bet):
-        while True:
-            message = f"{self.nickname} proposed \n{betDetails}\n"
-            self.client.send(message.encode('utf-8'))
-            break
-    '''
-
     '''BET INFORMATION------------------------------------------------------------------------------------------------'''
     bet_num = 0  # THIS IS FOR THE HOST BETS, THE NUMBER OF BETS THE HOST HAS PROPOSED
     bets = []
@@ -259,8 +186,8 @@ class Node:
             betValue = 10
             betRatio = 1.1
             gladiator_percent = 5
-            betEnterPerson1 = 'Covington'
-            betEnterPerson2 = 'Masvidal'
+            betEnterPerson1 = 'Walker'
+            betEnterPerson2 = 'Hill'
             betType = 'Victory'
 
             client_hash = Utilities.get_client_hash()
@@ -280,10 +207,7 @@ class Node:
                 "Opponent Bet Value": betRatio * betValue,
                 "Opponent Potential Winnings": betValue,
                 "Gladiator Percent": gladiator_percent,
-                "Host Percent": {
-                    "PROPOSER VICTORY": round(Utilities.get_log_percent(betValue), 2),
-                    "OPPONENT VICTORY": round(Utilities.get_log_percent(betRatio * betValue), 2)
-                },
+                "Host Percent": 1, # WAS going to use something more complicated
                 'CLIENT HASH': client_hash,
                 'SERVER HASH': server_hash
             }
@@ -433,7 +357,7 @@ class Node:
 
 
 '''Client STUFF'''
-node = Node()
+node = Client()
 node.connect_to_server()
 node.run_threads()
 # node.propose_bet_to_server()
