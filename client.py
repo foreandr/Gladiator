@@ -2,10 +2,8 @@ import pickle
 import socket
 import threading
 from tkinter import *
-import LOGARITHM
 import CONSTANTS
 import Utilities
-import logging
 
 
 class Node:
@@ -16,7 +14,7 @@ class Node:
     '''Variables'''
 
     # Lists For Clients and Their Nicknames
-    nickname = "Andrefff"  # input("Tell us your name:")  # CHANGE FOR SECOND NODE
+    nickname = Utilities.get_nickname()  # input("Tell us your name:")  # CHANGE FOR SECOND NODE
     balance = 100
 
     clients = []
@@ -227,7 +225,7 @@ class Node:
         write_thread = threading.Thread(target=self.write_to_server)
         write_thread.start()
 
-    '''BET INFORMATION------------------------------------------------------------------------------------------------'''
+    '''BET INFORMATION------------------------------------------------------------------------------------------------
     proposed_bet = betFunctions.propose_single_bet()
 
     def propose_bet_to_server(self, betDetails=proposed_bet):
@@ -235,6 +233,7 @@ class Node:
             message = f"{self.nickname} proposed \n{betDetails}\n"
             self.client.send(message.encode('utf-8'))
             break
+    '''
 
     '''BET INFORMATION------------------------------------------------------------------------------------------------'''
     bet_num = 0  # THIS IS FOR THE HOST BETS, THE NUMBER OF BETS THE HOST HAS PROPOSED
@@ -246,7 +245,6 @@ class Node:
         root = Tk()  # Create root
         root.title(f"Gladiator CLIENT Test {self.nickname}")
         root.geometry("500x500")
-        bet_details = []
 
         def askBets():
             ask_message = {
